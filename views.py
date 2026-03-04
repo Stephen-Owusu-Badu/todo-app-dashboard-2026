@@ -1,10 +1,10 @@
 import random
+import json
 from flask import Blueprint, render_template, redirect, url_for
 from flask import request
-from task import Task
 from flask_login import login_required, current_user
 from models import db, Task, User, Visit, Waitlist
-# import datetime
+from sqlalchemy import func as sqlfunc
 import datetime
 
 # Create a blueprint
@@ -36,40 +36,144 @@ def index():
 
 @main_blueprint.route('/invitation', methods=['GET', 'POST'])
 def invitation():
+    if request.method == 'GET':
+        log_visit(page='invitation', user_id=current_user.id if current_user.is_authenticated else None)
 
     if request.method == 'POST':
         email = request.form['email']
-        # Here you would send a verification email and add to waitlist
-        print(f"Sending invitation to {email}")
+        # Save email to the waitlist if not already present
+        if not Waitlist.query.filter_by(email=email).first():
+            entry = Waitlist(email=email)
+            db.session.add(entry)
+            db.session.commit()
+        log_visit(page='waitlist', user_id=current_user.id if current_user.is_authenticated else None)
     return render_template('invitation.html')
 
 
 @main_blueprint.route('/todo', methods=['GET', 'POST'])
 @login_required
 def todo():
+    log_visit(page='todo', user_id=current_user.id)
     return render_template('todo.html')
 
 
 @main_blueprint.route('/dashboard', methods=['GET', 'POST'])
 # @login_required
 def dashboard():
-    visits = Visit.query.all()
+    today = datetime.datetime.utcnow().date()
+    week_start = datetime.datetime.utcnow() - datetime.timedelta(days=6)
 
-    chart_week = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    # --- Stats cards ---
+    visits_today = Visit.query.filter(
+        sqlfunc.date(Visit.timestamp) == today
+    ).count()
 
-    week_notes = [random.randint(0, 15) for _ in range(7)]
-    two_week_notes = [random.randint(0, 15) for _ in range(7)]
+    new_users = Visit.query.filter(
+        Visit.page == 'signup',
+        Visit.timestamp >= week_start
+    ).count()
+
+    waitlist_this_week = Waitlist.query.filter(
+        Waitlist.timestamp >= week_start
+    ).count()
+
+    total_users = User.query.count()
+
+    # --- DB stats ---
+    total_visits = Visit.query.count()
+    total_tasks = Task.query.count()
+    users = User.query.all()
+    waitlist = Waitlist.query.all()
+
+    # --- Recent 15 visits (newest first) ---
+    recent_visits = Visit.query.order_by(Visit.timestamp.desc()).limit(15).all()
+
+    # --- Chart labels: last 7 days with today as last ---
+    chart_labels = []
+    for i in range(6, -1, -1):
+        day = today - datetime.timedelta(days=i)
+        chart_labels.append(day.strftime('%a'))
+
+    # --- Index page visits: this week vs last week (daily) ---
+    week_visits = []
+    two_week_visits = []
+    for i in range(6, -1, -1):
+        this_day = today - datetime.timedelta(days=i)
+        prev_day = this_day - datetime.timedelta(days=7)
+        week_visits.append(
+            Visit.query.filter(Visit.page == 'index',
+                               sqlfunc.date(Visit.timestamp) == this_day).count()
+        )
+        two_week_visits.append(
+            Visit.query.filter(Visit.page == 'index',
+                               sqlfunc.date(Visit.timestamp) == prev_day).count()
+        )
+
+    # --- New signups per day: this week vs last week ---
+    week_notes = []
+    two_week_notes = []
+    for i in range(6, -1, -1):
+        this_day = today - datetime.timedelta(days=i)
+        prev_day = this_day - datetime.timedelta(days=7)
+        week_notes.append(
+            Visit.query.filter(Visit.page == 'signup',
+                               sqlfunc.date(Visit.timestamp) == this_day).count()
+        )
+        two_week_notes.append(
+            Visit.query.filter(Visit.page == 'signup',
+                               sqlfunc.date(Visit.timestamp) == prev_day).count()
+        )
+
+    # --- Page visits today for bar chart ---
+    page_visits_query = (
+        db.session.query(Visit.page, sqlfunc.count(Visit.id))
+        .filter(sqlfunc.date(Visit.timestamp) == today)
+        .group_by(Visit.page)
+        .all()
+    )
+    page_visit_labels = json.dumps([row[0] for row in page_visits_query])
+    page_visits_data = json.dumps([row[1] for row in page_visits_query])
+
+    # --- Productivity change (index visits this week vs last week) ---
+    total_this_week = sum(week_visits)
+    total_last_week = sum(two_week_visits)
+    if total_last_week > 0:
+        productivity_change = round(((total_this_week - total_last_week) / total_last_week) * 100, 1)
+    elif total_this_week > 0:
+        productivity_change = 100
+    else:
+        productivity_change = 0
+
+    # --- Users change (new signups this week vs last week) ---
+    total_new_this = sum(week_notes)
+    total_new_last = sum(two_week_notes)
+    if total_new_last > 0:
+        users_change = round(((total_new_this - total_new_last) / total_new_last) * 100, 1)
+    elif total_new_this > 0:
+        users_change = 100
+    else:
+        users_change = 0
 
     return render_template('admin.html',
                            date=datetime.datetime.now().strftime("%B %d, %Y"),
-                           total_users=716,     # add real number
-                           new_users=5,         # add real number
-                           visits_today=120,    # add real number
-                           productivity_change=0.6,   # add real number
-                           visits=visits,           # add real value
-                           chart_week=chart_week,   # update list to show today as the last day in the chart
-                           week_notes=week_notes,   # add real values
-                           two_week_notes=two_week_notes  # add real values
+                           total_users=total_users,
+                           new_users=new_users,
+                           visits_today=visits_today,
+                           waitlist_this_week=waitlist_this_week,
+                           productivity_change=productivity_change,
+                           users_change=users_change,
+                           visits=recent_visits,
+                           total_visits=total_visits,
+                           total_tasks=total_tasks,
+                           users=users,
+                           waitlist=waitlist,
+                           chart_week=json.dumps(chart_labels),
+                           week_notes=week_notes,
+                           two_week_notes=two_week_notes,
+                           week_visits=week_visits,
+                           two_week_visits=two_week_visits,
+                           page_visits=page_visits_data,
+                           page_visit_labels=page_visit_labels
                            )
 
 
@@ -90,6 +194,7 @@ def api_create_task():
     new_task = Task(title=data['title'], user_id=current_user.id)
     db.session.add(new_task)
     db.session.commit()
+    log_visit(page='task-create', user_id=current_user.id)
     return {
         "task": new_task.to_dict()
     }, 201
@@ -105,7 +210,7 @@ def api_toggle_task(task_id):
 
     task.toggle()
     db.session.commit()
-
+    log_visit(page='task-toggle', user_id=current_user.id)
     return {"task": task.to_dict()}, 200
 
 
@@ -119,5 +224,5 @@ def remove(task_id):
 
     db.session.delete(task)
     db.session.commit()
-
+    log_visit(page='task-delete', user_id=current_user.id)
     return redirect(url_for('main.todo'))

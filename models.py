@@ -8,6 +8,7 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     tasks = db.relationship('Task', backref='user')
     visits = db.relationship('Visit')  # added visits to user
 

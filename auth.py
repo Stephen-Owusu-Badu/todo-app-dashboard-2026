@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for
 from flask import request
-from models import db, User
+from models import db, User, Visit
 from flask_login import login_user, logout_user, login_required
 
 # Create a blueprint
@@ -11,6 +11,11 @@ auth_blueprint = Blueprint('auth', __name__)
 # in the same file
 @auth_blueprint.route('/signup', methods=['GET', 'POST'])
 def signup():
+    if request.method == 'GET':
+        visit = Visit(page='signup-page', user=None)
+        db.session.add(visit)
+        db.session.commit()
+
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -28,6 +33,11 @@ def signup():
         db.session.add(new_user)
         db.session.commit()
 
+        # Log the successful signup
+        visit = Visit(page='signup', user=new_user.id)
+        db.session.add(visit)
+        db.session.commit()
+
         return redirect(url_for('auth.login'))
 
     return render_template('signup.html')
@@ -35,6 +45,11 @@ def signup():
 
 @auth_blueprint.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'GET':
+        visit = Visit(page='login', user=None)
+        db.session.add(visit)
+        db.session.commit()
+
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
@@ -43,6 +58,11 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             return redirect(url_for('main.todo'))
+        else:
+            # Log failed login attempt
+            visit = Visit(page='login-error', user=None)
+            db.session.add(visit)
+            db.session.commit()
         
     return render_template('login.html')
 

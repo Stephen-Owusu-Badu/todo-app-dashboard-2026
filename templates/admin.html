@@ -228,10 +228,9 @@
                   <div class="numbers">
                     <p class="text-sm mb-0 text-uppercase font-weight-bold">Waitlist</p>
                     <h5 class="font-weight-bolder">
-                      {{ waitlist|length }}
+                      {{ waitlist_this_week }}
                     </h5>
                     <p class="mb-0">
-
                       this week
                     </p>
                   </div>
@@ -301,14 +300,14 @@
             <div class="card-header pb-0 pt-3 bg-transparent">
               <h6 class="text-capitalize">New Users</h6>
               <p class="text-sm mb-0">
-                {% if productivity_change == 0 %}
+                {% if users_change == 0 %}
                 <span class="text-success text-sm font-weight-bolder">same as</span> the week before
-              {% elif productivity_change > 0 %}
+              {% elif users_change > 0 %}
                 <i class="fa fa-arrow-up text-success"></i>
-                <span class="text-success text-sm font-weight-bolder">+{{productivity_change}}% more</span> than the week before
+                <span class="text-success text-sm font-weight-bolder">+{{users_change}}% more</span> than the week before
               {% else %}
                 <i class="fa fa-arrow-down text-danger"></i>
-                <span class="text-danger text-sm font-weight-bolder">{{productivity_change * -1}}% less</span> than the week before
+                <span class="text-danger text-sm font-weight-bolder">{{users_change * -1}}% less</span> than the week before
               {% endif %} 
               </p>
             </div>
@@ -345,19 +344,19 @@
                 <!-- <canvas id="chart-line2" class="chart-canvas" height="300"></canvas> -->
               <div class="row">
                 <div class="col-6">  
-                  <span>Database has {{ visits|length }} visits</span>
+                  <span>Database has {{ total_visits }} visits</span>
                   <br>
-                  <span>Database has {{ users|length }} Users</span>
+                  <span>Database has {{ total_users }} Users</span>
                   <br>
-                  <span>Database has {{ tasks|length }} Tasks</span>
+                  <span>Database has {{ total_tasks }} Tasks</span>
 
                   
 
                   <br><br>
                   <h6 class="text-capitalize">Recent visits</h6>
                   <p class="text-sm mb-0">
-                    {% for visit in visits[0:11] %}
-                    <span>{{ visit.date }} : {{ visit.page }}</span>
+                    {% for visit in visits %}
+                    <span>{{ visit.timestamp }} : {{ visit.page }}</span>
                     <br>
                     {% endfor %}
                   </p>
@@ -367,8 +366,8 @@
                   <p class="text-sm mb-0 text-danger">
                     
                     {% for visit in visits %}
-                      {% if visit.page == "state-not-found" or visit.page == "State-mismatch" %}
-                        <span>{{ visit.date }} : {{ visit.page }}</span>
+                      {% if visit.page == "state-not-found" or visit.page == "State-mismatch" or visit.page == "login-error" %}
+                        <span>{{ visit.timestamp }} : {{ visit.page }}</span>
                         <br>
                       {% endif %}
                     {% endfor %}
@@ -381,7 +380,7 @@
                   <p class="text-sm mb-0">
                     {% for visit in visits %}
                       {% if visit.page == "try" %}
-                      <span>{{ visit.date }} : {{ visit.page }}</span>
+                      <span>{{ visit.timestamp }} : {{ visit.page }}</span>
                       <br>
                       {% endif %}
                     {% endfor %}
@@ -435,10 +434,10 @@
                 {% for user in users: %}
                 <li class="list-group-item border-0 d-flex p-4 mb-2 bg-gray-100 border-radius-lg">
                   <div class="d-flex flex-column">
-                    <h6 class="mb-3 text-sm">{{ user.name }}</h6>
+                    <h6 class="mb-3 text-sm">{{ user.email }}</h6>
                     <span class="mb-2 text-xs">Email Address: <span class="text-dark ms-sm-2 font-weight-bold"> {{ user.email }}</span></span>
-                    <span class="text-xs">Joined on: <span class="text-dark ms-sm-2 font-weight-bold">{{ user.date_created }}</span></span>
-                    <span class="text-xs">Total tasks: <span class="text-dark ms-sm-2 font-weight-bold">{{ user.notes|length }}</span></span>
+                    <span class="text-xs">Joined on: <span class="text-dark ms-sm-2 font-weight-bold">{{ user.created_at if user.created_at else 'N/A' }}</span></span>
+                    <span class="text-xs">Total tasks: <span class="text-dark ms-sm-2 font-weight-bold">{{ user.tasks|length }}</span></span>
                   </div>
                   <div class="ms-auto text-end">
                     {% if user.id != 1 %}
@@ -465,8 +464,7 @@
                 <li class="list-group-item border-0 d-flex p-4 mb-2 bg-gray-100 border-radius-lg">
                   <div class="d-flex flex-column">
                     <span class="mb-2 text-xs">Email Address: <span class="text-dark ms-sm-2 font-weight-bold"> {{ user.email }}</span></span>
-                    <span class="text-xs">Joined on: <span class="text-dark ms-sm-2 font-weight-bold">{{ user.date }}</span></span>
-                    <span class="text-xs">IP-address: <span class="text-dark ms-sm-2 font-weight-bold">{{ user.ip_address }}</span></span>
+                    <span class="text-xs">Joined on: <span class="text-dark ms-sm-2 font-weight-bold">{{ user.timestamp }}</span></span>
                   </div>
                   <div class="ms-auto text-end">
                     
@@ -583,7 +581,7 @@
     new Chart(ctx1, {
       type: "bar",
       data: {
-        labels: ["index", "login-g", "callback", "user-name", "license", "waitlist", "state-not-found", "State-mismatch"],
+        labels: {{ page_visit_labels | safe }},
         datasets: [{
           label: "visits",
           tension: 0.2,
@@ -593,7 +591,7 @@
           backgroundColor: "#2d89ce",
           borderWidth: 4,
           fill: false,
-          data: {{ page_visits }},
+          data: {{ page_visits | safe }},
           maxBarThickness: 26
         },
         // {
