@@ -58,9 +58,14 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             return redirect(url_for('main.todo'))
+        elif not user:
+            # No account found with that email
+            visit = Visit(page=f'login-error: no account for {email}', user=None)
+            db.session.add(visit)
+            db.session.commit()
         else:
-            # Log failed login attempt
-            visit = Visit(page='login-error', user=None)
+            # Account exists but password was wrong
+            visit = Visit(page=f'login-error: incorrect password for {email}', user=None)
             db.session.add(visit)
             db.session.commit()
         

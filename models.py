@@ -1,3 +1,4 @@
+import datetime
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
@@ -8,7 +9,7 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
-    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    created_at = db.Column(db.DateTime, default=datetime.datetime.now)
     tasks = db.relationship('Task', backref='user')
     visits = db.relationship('Visit')  # added visits to user
 
@@ -52,7 +53,7 @@ class Visit(db.Model):
         db.ForeignKey('user.id'),
         nullable=True  # nullable so that we can log visits without a user
     )
-    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.now)
 
     def __repr__(self):
         return f"<Visit id={self.id} page='{self.page}' timestamp={self.timestamp}>"
@@ -61,7 +62,7 @@ class Visit(db.Model):
 class Waitlist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(80), unique=True, nullable=False)
-    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
+    timestamp = db.Column(db.DateTime, default=datetime.datetime.now)
 
     def __repr__(self):
         return f"<Waitlist id={self.id} email='{self.email}' timestamp={self.timestamp}>"

@@ -60,8 +60,8 @@ def todo():
 @main_blueprint.route('/dashboard', methods=['GET', 'POST'])
 # @login_required
 def dashboard():
-    today = datetime.datetime.utcnow().date()
-    week_start = datetime.datetime.utcnow() - datetime.timedelta(days=6)
+    today = datetime.datetime.now().date()
+    week_start = datetime.datetime.now() - datetime.timedelta(days=6)
 
     # --- Stats cards ---
     visits_today = Visit.query.filter(
@@ -85,8 +85,28 @@ def dashboard():
     users = User.query.all()
     waitlist = Waitlist.query.all()
 
-    # --- Recent 15 visits (newest first) ---
-    recent_visits = Visit.query.order_by(Visit.timestamp.desc()).limit(15).all()
+    # --- Pages we actively track (not errors) ---
+    TRACKED_PAGES = ['index', 'invitation', 'waitlist', 'todo', 'dashboard',
+                     'signup-page', 'signup', 'login', 'task-create',
+                     'task-toggle', 'task-delete', 'try']
+
+    # --- Recent 15 legitimate visits (newest first, errors excluded) ---
+    recent_visits = (
+        Visit.query
+        .filter(Visit.page.in_(TRACKED_PAGES))
+        .order_by(Visit.timestamp.desc())
+        .limit(15)
+        .all()
+    )
+
+    # --- Recent 15 errors (newest first) ---
+    recent_errors = (
+        Visit.query
+        .filter(~Visit.page.in_(TRACKED_PAGES))
+        .order_by(Visit.timestamp.desc())
+        .limit(15)
+        .all()
+    )
 
     # --- Chart labels: last 7 days with today as last ---
     chart_labels = []
@@ -124,10 +144,13 @@ def dashboard():
                                sqlfunc.date(Visit.timestamp) == prev_day).count()
         )
 
-    # --- Page visits today for bar chart ---
+    # --- Page visits today for bar chart (tracked pages only) ---
     page_visits_query = (
         db.session.query(Visit.page, sqlfunc.count(Visit.id))
-        .filter(sqlfunc.date(Visit.timestamp) == today)
+        .filter(
+            sqlfunc.date(Visit.timestamp) == today,
+            Visit.page.in_(TRACKED_PAGES)
+        )
         .group_by(Visit.page)
         .all()
     )
@@ -163,6 +186,7 @@ def dashboard():
                            productivity_change=productivity_change,
                            users_change=users_change,
                            visits=recent_visits,
+                           errors=recent_errors,
                            total_visits=total_visits,
                            total_tasks=total_tasks,
                            users=users,
