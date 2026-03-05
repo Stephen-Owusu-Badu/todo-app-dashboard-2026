@@ -79,16 +79,47 @@ def dashboard():
 
     total_users = User.query.count()
 
+    # --- Returning vs new users ---
+    returning_users = User.query.filter(
+        User.created_at < datetime.datetime.now() - datetime.timedelta(days=7)
+    ).count()
+    first_time_users = total_users - returning_users
+
     # --- DB stats ---
     total_visits = Visit.query.count()
     total_tasks = Task.query.count()
+    avg_tasks = round(total_tasks / total_users, 1) if total_users > 0 else 0
     users = User.query.all()
     waitlist = Waitlist.query.all()
 
-    # --- Pages we actively track (not errors) ---
+    # --- Errors today ---
     TRACKED_PAGES = ['index', 'invitation', 'waitlist', 'todo', 'dashboard',
                      'signup-page', 'signup', 'login', 'task-create',
                      'task-toggle', 'task-delete', 'try']
+    errors_today = Visit.query.filter(
+        sqlfunc.date(Visit.timestamp) == today,
+        ~Visit.page.in_(TRACKED_PAGES)
+    ).count()
+
+    # --- User activity timeline: last login + last task per user ---
+    user_activity = {}
+    for u in users:
+        last_login_visit = (
+            Visit.query
+            .filter(Visit.user == u.id, Visit.page == 'login')
+            .order_by(Visit.timestamp.desc())
+            .first()
+        )
+        last_task = (
+            Task.query
+            .filter_by(user_id=u.id)
+            .order_by(Task.id.desc())
+            .first()
+        )
+        user_activity[u.id] = {
+            'last_login': last_login_visit.timestamp if last_login_visit else None,
+            'last_task': last_task.title if last_task else None,
+        }
 
     # --- Recent 15 legitimate visits (newest first, errors excluded) ---
     recent_visits = (
@@ -181,6 +212,11 @@ def dashboard():
                            date=datetime.datetime.now().strftime("%B %d, %Y"),
                            total_users=total_users,
                            new_users=new_users,
+                           returning_users=returning_users,
+                           first_time_users=first_time_users,
+                           avg_tasks=avg_tasks,
+                           errors_today=errors_today,
+                           user_activity=user_activity,
                            visits_today=visits_today,
                            waitlist_this_week=waitlist_this_week,
                            productivity_change=productivity_change,
@@ -200,6 +236,57 @@ def dashboard():
                            page_visit_labels=page_visit_labels
                            )
 
+
+
+@main_blueprint.route('/api/v1/errors/clear', methods=['POST'])
+def clear_errors():
+    TRACKED_PAGES = ['index', 'invitation', 'waitlist', 'todo', 'dashboard',
+                     'signup-page', 'signup', 'login', 'task-create',
+                     'task-toggle', 'task-delete', 'try']
+    Visit.query.filter(~Visit.page.in_(TRACKED_PAGES)).delete(synchronize_session=False)
+    db.session.commit()
+    return {'status': 'ok'}
+
+
+@main_blueprint.route('/api/v1/dashboard-stats', methods=['GET'])
+def dashboard_stats():
+    today = datetime.datetime.now().date()
+    week_start = datetime.datetime.now() - datetime.timedelta(days=7)
+    TRACKED_PAGES = ['index', 'invitation', 'waitlist', 'todo', 'dashboard',
+                     'signup-page', 'signup', 'login', 'task-create',
+                     'task-toggle', 'task-delete', 'try']
+    visits_today = Visit.query.filter(sqlfunc.date(Visit.timestamp) == today).count()
+    new_users = Visit.query.filter(Visit.page == 'signup', Visit.timestamp >= week_start).count()
+    total_users = User.query.count()
+    errors_today = Visit.query.filter(
+        sqlfunc.date(Visit.timestamp) == today,
+        ~Visit.page.in_(TRACKED_PAGES)
+    ).count()
+    total_tasks = Task.query.count()
+    avg_tasks = round(total_tasks / total_users, 1) if total_users > 0 else 0
+    recent_errors = (
+        Visit.query
+        .filter(~Visit.page.in_(TRACKED_PAGES))
+        .order_by(Visit.timestamp.desc())
+        .limit(15)
+        .all()
+    )
+    recent_visits = (
+        Visit.query
+        .filter(Visit.page.in_(TRACKED_PAGES))
+        .order_by(Visit.timestamp.desc())
+        .limit(15)
+        .all()
+    )
+    return {
+        'visits_today': visits_today,
+        'new_users': new_users,
+        'total_users': total_users,
+        'errors_today': errors_today,
+        'avg_tasks': avg_tasks,
+        'recent_visits': [{'timestamp': str(v.timestamp), 'page': v.page} for v in recent_visits],
+        'recent_errors': [{'id': e.id, 'timestamp': str(e.timestamp), 'page': e.page} for e in recent_errors],
+    }
 
 
 @main_blueprint.route('/api/v1/tasks', methods=['GET'])

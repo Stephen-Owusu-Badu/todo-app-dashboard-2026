@@ -178,11 +178,10 @@
                 <div class="col-8">
                   <div class="numbers">
                     <p class="text-sm mb-0 text-uppercase font-weight-bold">Today's Visits</p>
-                    <h5 class="font-weight-bolder">
+                    <h5 class="font-weight-bolder" id="stat-visits-today">
                       {{ visits_today }}
                     </h5>
                     <p class="mb-0">
-
                       yesterday
                     </p>
                   </div>
@@ -203,7 +202,7 @@
                 <div class="col-8">
                   <div class="numbers">
                     <p class="text-sm mb-0 text-uppercase font-weight-bold">New Users</p>
-                    <h5 class="font-weight-bolder">
+                    <h5 class="font-weight-bolder" id="stat-new-users">
                       {{ new_users }}
                     </h5>
                     <p class="mb-0">
@@ -251,7 +250,7 @@
                 <div class="col-8">
                   <div class="numbers">
                     <p class="text-sm mb-0 text-uppercase font-weight-bold">Users</p>
-                    <h5 class="font-weight-bolder">
+                    <h5 class="font-weight-bolder" id="stat-total-users">
                       {{ total_users }}
                     </h5>
                     <p class="mb-0">
@@ -262,6 +261,73 @@
                 <div class="col-4 text-end">
                   <div class="icon icon-shape bg-gradient-danger shadow-danger text-center rounded-circle">
                     <i class="ni ni-favourite-28 text-lg opacity-10" aria-hidden="true"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Second stats row -->
+      <div class="row mt-3">
+        <div class="col-xl-4 col-sm-6 mb-xl-0 mb-4">
+          <div class="card">
+            <div class="card-body p-3">
+              <div class="row">
+                <div class="col-8">
+                  <div class="numbers">
+                    <p class="text-sm mb-0 text-uppercase font-weight-bold">Returning Users</p>
+                    <h5 class="font-weight-bolder" id="stat-returning">{{ returning_users }}</h5>
+                    <p class="mb-0 text-xs">
+                      <span class="text-success font-weight-bolder">{{ returning_users }}</span> returning &nbsp;·&nbsp;
+                      <span class="text-info font-weight-bolder">{{ first_time_users }}</span> new
+                    </p>
+                  </div>
+                </div>
+                <div class="col-4 text-end">
+                  <div class="icon icon-shape bg-gradient-info shadow text-center rounded-circle">
+                    <i class="ni ni-single-02 text-lg opacity-10" aria-hidden="true"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-xl-4 col-sm-6 mb-xl-0 mb-4">
+          <div class="card">
+            <div class="card-body p-3">
+              <div class="row">
+                <div class="col-8">
+                  <div class="numbers">
+                    <p class="text-sm mb-0 text-uppercase font-weight-bold">Avg Tasks / User</p>
+                    <h5 class="font-weight-bolder" id="stat-avg-tasks">{{ avg_tasks }}</h5>
+                    <p class="mb-0">across all users</p>
+                  </div>
+                </div>
+                <div class="col-4 text-end">
+                  <div class="icon icon-shape bg-gradient-warning shadow-warning text-center rounded-circle">
+                    <i class="ni ni-calendar-grid-58 text-lg opacity-10" aria-hidden="true"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-xl-4 col-sm-6">
+          <div class="card">
+            <div class="card-body p-3">
+              <div class="row">
+                <div class="col-8">
+                  <div class="numbers">
+                    <p class="text-sm mb-0 text-uppercase font-weight-bold">Errors Today</p>
+                    <h5 class="font-weight-bolder text-danger" id="stat-errors-today">{{ errors_today }}</h5>
+                    <p class="mb-0">logged today</p>
+                  </div>
+                </div>
+                <div class="col-4 text-end">
+                  <div class="icon icon-shape bg-gradient-danger shadow-danger text-center rounded-circle">
+                    <i class="ni ni-bell-55 text-lg opacity-10" aria-hidden="true"></i>
                   </div>
                 </div>
               </div>
@@ -354,16 +420,19 @@
 
                   <br><br>
                   <h6 class="text-capitalize">Recent visits</h6>
-                  <p class="text-sm mb-0">
+                  <p class="text-sm mb-0" id="recent-visits-list">
                     {% for visit in visits %}
                     <span>{{ visit.timestamp }} : {{ visit.page }}</span>
                     <br>
                     {% endfor %}
                   </p>
                 </div>
-                <div class="col-6">  
-                  <h6 class="text-capitalize">Recent Errors</h6>
-                  <p class="text-sm mb-0 text-danger">
+                <div class="col-6">
+                  <div class="d-flex align-items-center justify-content-between mb-1">
+                    <h6 class="text-capitalize mb-0">Recent Errors</h6>
+                    <button class="btn btn-sm btn-outline-danger py-1 px-2" onclick="clearErrors()" style="font-size:0.7rem;">Clear All</button>
+                  </div>
+                  <p class="text-sm mb-0 text-danger" id="recent-errors-list">
                     {% for error in errors %}
                       <span>{{ error.timestamp }} : {{ error.page }}</span>
                       <br>
@@ -422,6 +491,8 @@
                     <span class="mb-2 text-xs">Email Address: <span class="text-dark ms-sm-2 font-weight-bold"> {{ user.email }}</span></span>
                     <span class="text-xs">Joined on: <span class="text-dark ms-sm-2 font-weight-bold">{{ user.created_at if user.created_at else 'N/A' }}</span></span>
                     <span class="text-xs">Total tasks: <span class="text-dark ms-sm-2 font-weight-bold">{{ user.tasks|length }}</span></span>
+                    <span class="text-xs">Last login: <span class="text-dark ms-sm-2 font-weight-bold">{{ user_activity[user.id].last_login.strftime('%b %d, %Y %H:%M') if user_activity[user.id].last_login else 'Never' }}</span></span>
+                    <span class="text-xs">Last task: <span class="text-dark ms-sm-2 font-weight-bold">{{ user_activity[user.id].last_task or 'None' }}</span></span>
                   </div>
                   <div class="ms-auto text-end">
                     {% if user.id != 1 %}
@@ -851,7 +922,52 @@
     }
   </script>
 
-  
+  <script>
+    // --- Auto-refresh dashboard stats every 30 seconds ---
+    function refreshStats() {
+      fetch('/api/v1/dashboard-stats')
+        .then(r => r.json())
+        .then(data => {
+          // Update stat cards
+          document.getElementById('stat-visits-today').textContent = data.visits_today;
+          document.getElementById('stat-new-users').textContent = data.new_users;
+          document.getElementById('stat-total-users').textContent = data.total_users;
+          document.getElementById('stat-errors-today').textContent = data.errors_today;
+          document.getElementById('stat-avg-tasks').textContent = data.avg_tasks;
+
+          // Update recent visits list
+          let visitsHtml = '';
+          data.recent_visits.forEach(v => {
+            visitsHtml += `<span>${v.timestamp} : ${v.page}</span><br>`;
+          });
+          document.getElementById('recent-visits-list').innerHTML = visitsHtml || '<span class="text-muted">No visits yet</span>';
+
+          // Update recent errors list
+          let errorsHtml = '';
+          data.recent_errors.forEach(e => {
+            errorsHtml += `<span>${e.timestamp} : ${e.page}</span><br>`;
+          });
+          document.getElementById('recent-errors-list').innerHTML = errorsHtml || '<span class="text-muted text-success">No errors</span>';
+        })
+        .catch(err => console.warn('Auto-refresh failed:', err));
+    }
+
+    // --- Clear all errors ---
+    function clearErrors() {
+      if (!confirm('Clear all error logs?')) return;
+      fetch('/api/v1/errors/clear', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => {
+          document.getElementById('recent-errors-list').innerHTML = '<span class="text-muted text-success">No errors</span>';
+          document.getElementById('stat-errors-today').textContent = '0';
+        })
+        .catch(err => console.warn('Clear errors failed:', err));
+    }
+
+    // Refresh every 30 seconds
+    setInterval(refreshStats, 30000);
+  </script>
+
 </body>
 
 </html>
